@@ -5,7 +5,7 @@ import signal
 import subprocess
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 CONFIG = os.environ.get(
     "TAPO_CONFIG",
@@ -154,7 +154,8 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        if self.path not in ("/", "/stream", "/stream/"):
+        # Mainsail appends ?timestamp=... to bust caching; ignore the query string.
+        if urlsplit(self.path).path not in ("/", "/stream", "/stream/"):
             self.send_error(404)
             return
 
