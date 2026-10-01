@@ -237,8 +237,8 @@ else
 fi
 TMP_POWER=""
 
-echo "Starting Tapo camera..."
-"$SERVICE" start
+echo "Restarting Tapo camera..."
+"$SERVICE" restart
 
 echo
 

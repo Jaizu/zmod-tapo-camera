@@ -59,7 +59,7 @@ is_system_service: False
 primary_branch: main
 ```
 
-Enable it with `ENABLE_PLUGIN name=tapo_camera`, or run `install.sh` from the plugin directory once to create the configuration. Enter the Tapo settings and set `ENABLED=1`, then run `install.sh` again; this starts the service and registers the enabled webcam. Restart Moonraker from Mainsail once so it loads the new webcam section. The service autostarts through a marked block in `/usr/data/config/mod_data/power_on.sh`.
+Enable it with `ENABLE_PLUGIN name=tapo_camera`, or run `install.sh` from the plugin directory once to create the configuration. Enter the Tapo settings and set `ENABLED=1`, then run `install.sh` again; this restarts the service and registers the enabled webcam. Z-Mod runs `update.sh` automatically after plugin updates, so updates restart the camera service without requiring SSH. Restart Moonraker from Mainsail once after the webcam is first registered so it loads the new webcam section. The service autostarts through a marked block in `/usr/data/config/mod_data/power_on.sh`.
 
 Repeated installs and updates replace only the plugin's marked blocks, preserve the camera configuration, and do not create another server process. Uninstall removes the webcam block and service hook, stops the service, restores the original startup hook (or removes it if the plugin created it), and removes the plugin configuration and files. Restart Moonraker from Mainsail after uninstall so Mainsail drops the webcam entry.
 
