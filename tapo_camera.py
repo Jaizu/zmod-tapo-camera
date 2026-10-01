@@ -139,6 +139,20 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         pass
 
+    def do_OPTIONS(self):
+        # Browsers preflight cross-origin fetch() calls (Mainsail's mjpegstreamer worker).
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "*")
+        self.end_headers()
+
+    def send_error(self, code, message=None, explain=None):
+        self.send_response(code, message)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     def do_GET(self):
         if self.path not in ("/", "/stream", "/stream/"):
             self.send_error(404)
