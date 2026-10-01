@@ -1,4 +1,3 @@
-```sh
 #!/bin/sh
 
 PLUGIN_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
@@ -23,6 +22,13 @@ is_camera_process() {
 }
 
 find_camera_pid() {
+    if command -v pgrep >/dev/null 2>&1; then
+        PID="$(pgrep -f "$PLUGIN_DIR/tapo_camera.py" 2>/dev/null | head -n 1)"
+        [ -n "$PID" ] || return 1
+        printf '%s\n' "$PID"
+        return 0
+    fi
+
     for CMDLINE_FILE in /proc/[0-9]*/cmdline; do
         [ -r "$CMDLINE_FILE" ] || continue
         CMDLINE="$(tr '\000' ' ' < "$CMDLINE_FILE" 2>/dev/null)"
@@ -173,4 +179,3 @@ case "${1:-}" in
         exit 1
         ;;
 esac
-```
