@@ -156,11 +156,11 @@ case "${1:-install}" in
     install)
         install_route
         ;;
-    remove)
+    remove|uninstall)
         remove_route
         ;;
     *)
-        echo "Usage: $0 {install|remove}"
+        echo "Usage: $0 {install|remove|uninstall}"
         exit 1
         ;;
 esac
