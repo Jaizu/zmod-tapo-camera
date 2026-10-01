@@ -155,6 +155,8 @@ class Handler(BaseHTTPRequestHandler):
         )
         self.send_header("Pragma", "no-cache")
         self.send_header("Connection", "close")
+        # Mainsail fetches this URL cross-origin (different port), requiring CORS.
+        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
 
         global proc
