@@ -3,23 +3,76 @@ set -e
 
 PLUGIN_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 
-CONFIG_DIR="/root/printer_data/config"
-CONF="$CONFIG_DIR/tapo_camera.conf"
+USER_CONFIG_DIR="/usr/data/config/mod_data"
+CONF="/root/printer_data/config/tapo_camera.conf"
 
-POWER_ON="/usr/data/config/mod_data/power_on.sh"
-POWER_ON_BACKUP="/usr/data/config/mod_data/power_on.sh.tapo_camera.orig"
-POWER_ON_CREATED="/usr/data/config/mod_data/power_on.sh.tapo_camera.created"
+MOONRAKER_CONF="$USER_CONFIG_DIR/user.moonraker.conf"
+MOONRAKER_CREATED="$MOONRAKER_CONF.tapo_camera.created"
+POWER_ON="$USER_CONFIG_DIR/power_on.sh"
+POWER_ON_BACKUP="$POWER_ON.tapo_camera.orig"
+POWER_ON_CREATED="$POWER_ON.tapo_camera.created"
 
 MARK_BEGIN="# ZMOD_TAPO_CAMERA_BEGIN"
 MARK_END="# ZMOD_TAPO_CAMERA_END"
+MOONRAKER_CONFIG_CHANGED=0
+TMP=""
+CONTENT=""
 
-SERVICE="$PLUGIN_DIR/tapo_camera.sh"
+cleanup() {
+    [ -z "$TMP" ] || rm -f "$TMP"
+    [ -z "$CONTENT" ] || rm -f "$CONTENT"
+}
+
+trap cleanup 0
+
+strip_managed_block() {
+    awk -v begin="$MARK_BEGIN" -v end="$MARK_END" '
+        $0 == begin {
+            inside=1
+            next
+        }
+        $0 == end && inside {
+            inside=0
+            next
+        }
+        !inside { print }
+        END {
+            if (inside) {
+                print "ERROR: unterminated ZMOD_TAPO_CAMERA block" > "/dev/stderr"
+                exit 2
+            }
+        }
+    ' "$1" > "$2"
+}
 
 echo "Stopping Tapo camera..."
+if [ -x "$PLUGIN_DIR/tapo_camera.sh" ]; then
+    "$PLUGIN_DIR/tapo_camera.sh" stop
+fi
 
-"$SERVICE" stop
+if [ -f "$MOONRAKER_CONF" ] && grep -Fqx "$MARK_BEGIN" "$MOONRAKER_CONF"; then
+    TMP="$(mktemp "${MOONRAKER_CONF}.tapo_camera.XXXXXX")"
+    CONTENT="$(mktemp "${MOONRAKER_CONF}.tapo_camera.XXXXXX")"
+    strip_managed_block "$MOONRAKER_CONF" "$CONTENT"
 
-"$PLUGIN_DIR/nginx_tapo.sh" uninstall
+    if [ -f "$MOONRAKER_CREATED" ] && ! awk 'NF { found=1 } END { exit !found }' "$CONTENT"; then
+        rm -f "$MOONRAKER_CONF"
+        MOONRAKER_CONFIG_CHANGED=1
+    else
+        cp -p "$MOONRAKER_CONF" "$TMP"
+        cat "$CONTENT" > "$TMP"
+        if ! cmp -s "$MOONRAKER_CONF" "$TMP"; then
+            mv "$TMP" "$MOONRAKER_CONF"
+            MOONRAKER_CONFIG_CHANGED=1
+        fi
+    fi
+    rm -f "$MOONRAKER_CREATED"
+    rm -f "$TMP" "$CONTENT"
+    TMP=""
+    CONTENT=""
+elif [ -f "$MOONRAKER_CREATED" ]; then
+    rm -f "$MOONRAKER_CREATED"
+fi
 
 #
 # Restore the original power_on.sh if the plugin backed it up.
@@ -35,48 +88,28 @@ elif [ -f "$POWER_ON_CREATED" ]; then
     echo "Removing power_on.sh created by tapo_camera..."
     rm -f "$POWER_ON" "$POWER_ON_CREATED"
 elif [ -f "$POWER_ON" ]; then
-    if grep -Fqx "$MARK_BEGIN" "$POWER_ON" && grep -Fqx "$MARK_END" "$POWER_ON"; then
+    if grep -Fqx "$MARK_BEGIN" "$POWER_ON"; then
         TMP="$(mktemp "${POWER_ON}.tapo_camera.XXXXXX")"
         CONTENT="$(mktemp "${POWER_ON}.tapo_camera.XXXXXX")"
-        trap 'rm -f "$TMP" "$CONTENT"' 0
-
-        awk -v begin="$MARK_BEGIN" -v end="$MARK_END" '
-            $0 == begin && !inside {
-                inside=1
-                block=$0 ORS
-                next
-            }
-
-            inside {
-                block=block $0 ORS
-                if ($0 == end) {
-                    inside=0
-                    block=""
-                }
-                next
-            }
-
-            { print }
-
-            END {
-                if (inside) {
-                    printf "%s", block
-                }
-            }
-        ' "$POWER_ON" > "$CONTENT"
-
+        strip_managed_block "$POWER_ON" "$CONTENT"
         cp -p "$POWER_ON" "$TMP"
         cat "$CONTENT" > "$TMP"
         mv "$TMP" "$POWER_ON"
+        rm -f "$CONTENT"
+        TMP=""
+        CONTENT=""
     fi
 fi
 
 rm -f "$CONF"
 
 echo "Removing plugin files..."
-
 cd /
 rm -rf "$PLUGIN_DIR"
 
 echo
 echo "tapo_camera uninstalled."
+if [ "$MOONRAKER_CONFIG_CHANGED" -eq 1 ]; then
+    echo "Moonraker webcam configuration removed. Restart Moonraker from Mainsail to apply it."
+fi
+echo "Nginx was not modified."

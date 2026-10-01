@@ -1,14 +1,6 @@
 # Z-Mod Tapo Camera
 
-A Z-Mod plugin for FlashForge AD5X/AD5M/AD5M Pro that exposes a network Tapo camera in Mainsail using the printer's built-in FFmpeg, Python and Nginx.
-
-## Status
-
-**Prototype / alpha.** The complete pipeline has been tested on an AD5X with Z-Mod:
-
-`FFmpeg test pattern -> MPJPEG -> Python HTTP -> LAN browser`
-
-The Tapo RTSP input and automatic Z-Mod installation still need to be tested on real hardware.
+A Z-Mod plugin for Flashforge AD5X that publishes a Tapo C210 RTSP camera as a native Mainsail webcam. It uses the printer's built-in FFmpeg and Python 3.8 and does not modify Nginx or internal Z-Mod files.
 
 ## Architecture
 
@@ -19,25 +11,21 @@ Tapo C210 RTSP (H.264)
 FFmpeg on printer
         |
         v
-multipart MJPEG
+Python multipart-MJPEG server on 0.0.0.0:8090
+        |
+        +--> Moonraker [webcam Tapo C210], service: ipstream
         |
         v
-Python HTTP server :8090 (localhost)
-        |
-        v
-Z-Mod Nginx /webcam/
-        |
-        v
-Mainsail
+Browser loads http://PRINTER_IP:8090/ directly
 ```
 
-TP-Link documents Tapo RTSP as `/stream1` (high quality) and `/stream2` (standard quality), using a separate camera account and port 554 by default.
+Moonraker stores webcam metadata and exposes it through `/server/webcams/list`; it does not proxy this stream. Mainsail's `ipstream` adapter loads the URL directly, so the address must be reachable from the browser. `HTTP_HOST=0.0.0.0` makes the stream available on the printer's network interfaces.
+
+The installed Moonraker reads the plugin's marked webcam section from `/usr/data/config/mod_data/user.moonraker.conf`, included by Z-Mod's Moonraker configuration. The plugin does not edit the included system configuration itself.
 
 ## Configuration
 
-The plugin creates `/root/printer_data/config/tapo_camera.conf`, which is editable in Mainsail under **Machine > Configuration Files**. Enter the camera details there; the settings take effect after restarting the service. Existing configurations at the former `/usr/data/config/mod_data/tapo_camera.conf` location are migrated during installation.
-
-Example:
+The plugin creates `/root/printer_data/config/tapo_camera.conf`, editable under **Machine > Configuration Files** in Mainsail. Settings for FFmpeg take effect after `tapo_camera.sh restart`. The installer uses `HTTP_PUBLIC_HOST=auto` to find the printer's default-route IPv4 address and writes the resulting browser URL into the marked Moonraker webcam section. Set `HTTP_PUBLIC_HOST` to a fixed IP or LAN hostname if automatic detection is unsuitable; rerun `install.sh` after changing it.
 
 ```ini
 ENABLED=1
@@ -50,16 +38,12 @@ WIDTH=640
 HEIGHT=360
 FPS=10
 JPEG_QUALITY=6
+HTTP_HOST=0.0.0.0
 HTTP_PORT=8090
+HTTP_PUBLIC_HOST=auto
 ```
 
-The RTSP URL is generated as:
-
-```text
-rtsp://USER:PASSWORD@HOST:PORT/STREAM
-```
-
-Credentials are URL-escaped by the launcher.
+The RTSP URL is generated as `rtsp://USER:PASSWORD@HOST:PORT/STREAM`; credentials are URL-escaped by the server. Do not commit real credentials.
 
 ## Installation
 
@@ -75,44 +59,21 @@ is_system_service: False
 primary_branch: main
 ```
 
-Then enable it:
+Enable it with `ENABLE_PLUGIN name=tapo_camera`, or run `install.sh` from the plugin directory once to create the configuration. Enter the Tapo settings and set `ENABLED=1`, then run `install.sh` again; this starts the service and registers the enabled webcam. Restart Moonraker from Mainsail once so it loads the new webcam section. The service autostarts through a marked block in `/usr/data/config/mod_data/power_on.sh`.
 
-```gcode
-ENABLE_PLUGIN name=tapo_camera
-```
+Repeated installs and updates replace only the plugin's marked blocks, preserve the camera configuration, and do not create another server process. Uninstall removes the webcam block and service hook, stops the service, restores the original startup hook (or removes it if the plugin created it), and removes the plugin configuration and files. Restart Moonraker from Mainsail after uninstall so Mainsail drops the webcam entry.
 
-The configuration is a plain key/value file in Mainsail's configuration editor, not a custom Mainsail settings form.
+## Testing
 
-## Development install
-
-Copy the repository to:
-
-```text
-/usr/data/config/mod_data/plugins/tapo_camera
-```
-
-Then run:
+From the plugin directory, the service supports:
 
 ```sh
-./install.sh
+./tapo_camera.sh start
+./tapo_camera.sh status
+./tapo_camera.sh restart
+./tapo_camera.sh stop
 ```
 
-## Testing without a Tapo
+Open `http://PRINTER_IP:8090/` from a device on the same LAN to test the stream directly. Moonraker should list the webcam at `http://PRINTER_IP:7125/server/webcams/list`. To test without a Tapo, stop the normal service first, then run `TEST_SOURCE=1 ./tapo_camera.sh start`.
 
-The included server can use FFmpeg's `testsrc` instead of RTSP:
-
-```sh
-TEST_SOURCE=1 ./tapo_camera.sh start
-```
-
-Then open:
-
-```text
-http://PRINTER_IP:8090/
-```
-
-## Security
-
-The HTTP server binds to `127.0.0.1` by default, so the camera stream is not directly exposed to the LAN. Nginx is intended to proxy it through the printer's existing Mainsail endpoint.
-
-Do not expose the Tapo RTSP port to the Internet. TP-Link recommends using a VPN rather than port forwarding for remote RTSP access.
+The `ipstream` adapter requires `stream_url`; a snapshot URL is optional and is not configured, so this integration provides live video only. If the printer's IP changes, update `HTTP_PUBLIC_HOST` and rerun the installer. This direct HTTP stream has no authentication or TLS; keep it on a trusted LAN and do not expose port 8090 or the Tapo RTSP port to the Internet.
