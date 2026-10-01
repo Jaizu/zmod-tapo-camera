@@ -13,13 +13,13 @@ FFmpeg on printer
         v
 Python multipart-MJPEG server on 0.0.0.0:8090
         |
-        +--> Moonraker [webcam Tapo C210], service: ipstream
+        +--> Moonraker [webcam Tapo C210], service: mjpegstreamer
         |
         v
 Browser loads http://PRINTER_IP:8090/ directly
 ```
 
-Moonraker stores webcam metadata and exposes it through `/server/webcams/list`; it does not proxy this stream. Mainsail's `ipstream` adapter loads the URL directly, so the address must be reachable from the browser. `HTTP_HOST=0.0.0.0` makes the stream available on the printer's network interfaces.
+Moonraker stores webcam metadata and exposes it through `/server/webcams/list`; it does not proxy this stream. Mainsail's `mjpegstreamer` adapter fetches the URL directly from the browser and parses the multipart MJPEG frames the server emits, so the address must be reachable from the browser. `HTTP_HOST=0.0.0.0` makes the stream available on the printer's network interfaces. Note that Mainsail's `ipstream` service type (listed in Moonraker's docs) is not actually implemented by Mainsail's current front-end code, which is why `mjpegstreamer` is used instead.
 
 The installed Moonraker reads the plugin's marked webcam section from `/usr/data/config/mod_data/user.moonraker.conf`, included by Z-Mod's Moonraker configuration. The plugin does not edit the included system configuration itself.
 
@@ -76,4 +76,4 @@ From the plugin directory, the service supports:
 
 Open `http://PRINTER_IP:8090/` from a device on the same LAN to test the stream directly. Moonraker should list the webcam at `http://PRINTER_IP:7125/server/webcams/list`. To test without a Tapo, stop the normal service first, then run `TEST_SOURCE=1 ./tapo_camera.sh start`.
 
-The `ipstream` adapter requires `stream_url`; a snapshot URL is optional and is not configured, so this integration provides live video only. If the printer's IP changes, update `HTTP_PUBLIC_HOST` and rerun the installer. This direct HTTP stream has no authentication or TLS; keep it on a trusted LAN and do not expose port 8090 or the Tapo RTSP port to the Internet.
+The `mjpegstreamer` adapter requires `stream_url` only; no snapshot URL is configured, so this integration provides live video only. If the printer's IP changes, update `HTTP_PUBLIC_HOST` and rerun the installer. This direct HTTP stream has no authentication or TLS; keep it on a trusted LAN and do not expose port 8090 or the Tapo RTSP port to the Internet.

@@ -193,7 +193,7 @@ fi
 
 cp -p "$MOONRAKER_CONF" "$TMP_MOONRAKER"
 cat "$CONTENT_MOONRAKER" > "$TMP_MOONRAKER"
-printf '%s\n%s\nenabled: %s\nservice: ipstream\ntarget_fps: %s\nstream_url: http://%s:%s/\n%s\n' \
+printf '%s\n%s\nenabled: %s\nservice: mjpegstreamer\ntarget_fps: %s\nstream_url: http://%s:%s/\n%s\n' \
     "$MARK_BEGIN" "$CAMERA_SECTION" "$CAMERA_ENABLED" "$FPS" "$PUBLIC_HOST" "$HTTP_PORT" "$MARK_END" >> "$TMP_MOONRAKER"
 
 if cmp -s "$MOONRAKER_CONF" "$TMP_MOONRAKER"; then
