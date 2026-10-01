@@ -1,10 +1,15 @@
 #!/bin/sh
+
 set -e
 
 ZMOD_ROOT="/usr/data/.mod/.zmod"
+
 NGINX="/usr/data/zmod/zmod/.shell/root/nginx/nginx"
 NGINX_TEMPLATE="/usr/data/zmod/zmod/.shell/root/nginx/nginx.conf"
-NGINX_CONF="/root/nginx/nginx.conf"
+
+# This is /root/nginx/nginx.conf from inside the ZMod chroot.
+NGINX_CONF_HOST="/usr/data/.mod/.zmod/root/nginx/nginx.conf"
+NGINX_CONF_CHROOT="/root/nginx/nginx.conf"
 
 TAPO_BACKUP="/usr/data/config/mod_data/tapo_camera.nginx.conf.bak"
 
@@ -14,7 +19,9 @@ install_route() {
         exit 1
     }
 
-    mkdir -p /root/nginx/client-body /root/nginx/proxy
+    mkdir -p \
+        /usr/data/.mod/.zmod/root/nginx/client-body \
+        /usr/data/.mod/.zmod/root/nginx/proxy
 
     # If the route is already present in the template, do not add it again.
     if grep -q "ZMOD_TAPO_CAMERA_BEGIN" "$NGINX_TEMPLATE"; then
@@ -59,19 +66,19 @@ install_route() {
     sed \
         -e "s/fluidd/${CLIENT}/g" \
         -e "s/mainsail/${CLIENT}/g" \
-        "$NGINX_TEMPLATE" > "$NGINX_CONF"
+        "$NGINX_TEMPLATE" > "$NGINX_CONF_HOST"
 
     # Nginx lives inside the ZMod chroot.
     if chroot "$ZMOD_ROOT" "$NGINX" \
         -t \
-        -c "$NGINX_CONF" \
+        -c "$NGINX_CONF_CHROOT" \
         -e /usr/data/config/mod_data/log/nginx.log
     then
         echo "Nginx configuration test passed"
 
         chroot "$ZMOD_ROOT" "$NGINX" \
             -s reload \
-            -c "$NGINX_CONF" \
+            -c "$NGINX_CONF_CHROOT" \
             2>/dev/null || true
 
         echo "Installed /tapo/ Nginx route"
@@ -85,7 +92,7 @@ install_route() {
         sed \
             -e "s/fluidd/${CLIENT}/g" \
             -e "s/mainsail/${CLIENT}/g" \
-            "$NGINX_TEMPLATE" > "$NGINX_CONF"
+            "$NGINX_TEMPLATE" > "$NGINX_CONF_HOST"
 
         exit 1
     fi
@@ -126,16 +133,16 @@ remove_route() {
     sed \
         -e "s/fluidd/${CLIENT}/g" \
         -e "s/mainsail/${CLIENT}/g" \
-        "$NGINX_TEMPLATE" > "$NGINX_CONF"
+        "$NGINX_TEMPLATE" > "$NGINX_CONF_HOST"
 
     if chroot "$ZMOD_ROOT" "$NGINX" \
         -t \
-        -c "$NGINX_CONF" \
+        -c "$NGINX_CONF_CHROOT" \
         -e /usr/data/config/mod_data/log/nginx.log
     then
         chroot "$ZMOD_ROOT" "$NGINX" \
             -s reload \
-            -c "$NGINX_CONF" \
+            -c "$NGINX_CONF_CHROOT" \
             2>/dev/null || true
 
         echo "Removed /tapo/ Nginx route"
