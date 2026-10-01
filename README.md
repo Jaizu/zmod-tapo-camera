@@ -35,7 +35,9 @@ TP-Link documents Tapo RTSP as `/stream1` (high quality) and `/stream2` (standar
 
 ## Configuration
 
-The plugin reads `/usr/data/config/mod_data/tapo_camera.conf` if present. Example:
+The plugin creates `/root/printer_data/config/tapo_camera.conf`, which is editable in Mainsail under **Machine > Configuration Files**. Enter the camera details there; the settings take effect after restarting the service. Existing configurations at the former `/usr/data/config/mod_data/tapo_camera.conf` location are migrated during installation.
+
+Example:
 
 ```ini
 ENABLED=1
@@ -61,25 +63,25 @@ Credentials are URL-escaped by the launcher.
 
 ## Installation
 
-Add the plugin to Z-Mod's Moonraker plugin configuration, then enable it:
+Add the plugin to Z-Mod's Moonraker plugin configuration:
 
 ```ini
 [update_manager tapo_camera]
 type: git_repo
 channel: dev
 path: /root/printer_data/config/mod_data/plugins/tapo_camera
-origin: https://github.com/jaizu/tapo_camera.git
+origin: https://github.com/Jaizu/zmod-tapo-camera.git
 is_system_service: False
 primary_branch: main
 ```
 
-Then:
+Then enable it:
 
 ```gcode
 ENABLE_PLUGIN name=tapo_camera
 ```
 
-> The repository URL above is a placeholder until the project is published. You can also copy the repository into the Z-Mod plugin directory manually while developing.
+The configuration is a plain key/value file in Mainsail's configuration editor, not a custom Mainsail settings form.
 
 ## Development install
 

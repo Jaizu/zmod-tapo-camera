@@ -2,17 +2,23 @@
 set -e
 
 PLUGIN_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-MOD_CONF="/usr/data/config/mod_data"
-CONF="$MOD_CONF/tapo_camera.conf"
+CONFIG_DIR="/root/printer_data/config"
+LEGACY_CONF="/usr/data/config/mod_data/tapo_camera.conf"
+CONF="$CONFIG_DIR/tapo_camera.conf"
 
-mkdir -p "$MOD_CONF" /usr/data/logs
+mkdir -p "$CONFIG_DIR" /usr/data/logs
 chmod 700 "$PLUGIN_DIR/tapo_camera.py" "$PLUGIN_DIR/tapo_camera.sh"
 
 if [ ! -f "$CONF" ]; then
-    cp "$PLUGIN_DIR/tapo_camera.conf.example" "$CONF"
-    chmod 600 "$CONF"
+    if [ -f "$LEGACY_CONF" ]; then
+        cp "$LEGACY_CONF" "$CONF"
+        echo "Migrated existing configuration from $LEGACY_CONF"
+    else
+        cp "$PLUGIN_DIR/tapo_camera.conf.example" "$CONF"
+    fi
     echo "Created $CONF"
 fi
+chmod 644 "$CONF"
 
 # Install a lightweight startup hook when Z-Mod's plugin directory is used.
 # The hook is deliberately independent of Klipper configuration.

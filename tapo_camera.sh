@@ -5,7 +5,7 @@ PIDFILE="/tmp/tapo_camera.pid"
 LOGFILE="/usr/data/logs/tapo_camera.log"
 PYTHON="/usr/prog/Python-3.8.2/bin/python3"
 PYTHON_LD="/usr/prog/Python-3.8.2/lib:/usr/prog/openssl-1.0.2d/lib"
-CONFIG="/usr/data/config/mod_data/tapo_camera.conf"
+CONFIG="/root/printer_data/config/tapo_camera.conf"
 
 mkdir -p /usr/data/logs /usr/data/config/mod_data
 
@@ -16,6 +16,7 @@ start() {
     fi
     if [ ! -f "$CONFIG" ]; then
         cp "$PLUGIN_DIR/tapo_camera.conf.example" "$CONFIG"
+        chmod 644 "$CONFIG"
         echo "Created $CONFIG; configure the Tapo camera first."
     fi
     export TAPO_CONFIG="$CONFIG"

@@ -1,6 +1,6 @@
 #!/bin/sh
 PLUGIN_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-CONF="/usr/data/config/mod_data/tapo_camera.conf"
+CONF="/root/printer_data/config/tapo_camera.conf"
 HOOK="/usr/data/zmod/zmod/.shell/S99tapo_camera"
 
 "$PLUGIN_DIR/tapo_camera.sh" stop 2>/dev/null || true

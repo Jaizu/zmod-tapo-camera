@@ -6,7 +6,7 @@ import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import quote
 
-CONFIG = os.environ.get("TAPO_CONFIG", "/usr/data/config/mod_data/tapo_camera.conf")
+CONFIG = os.environ.get("TAPO_CONFIG", "/root/printer_data/config/tapo_camera.conf")
 FFMPEG = "/usr/prog/ffmpeg-4.0.2/bin/ffmpeg"
 FFMPEG_LD = "/usr/prog/ffmpeg-4.0.2/lib:/usr/prog/x264/lib"
 DEFAULTS = {
