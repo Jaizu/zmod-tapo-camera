@@ -177,14 +177,13 @@ if [ ! -f "$MOONRAKER_CONF" ]; then
     touch "$MOONRAKER_CREATED"
 fi
 
-TMP_MOONRAKER="$(mktemp "${MOONRAKER_CONF}.tapo_camera.XXXXXX")"
 CONTENT_MOONRAKER="$(mktemp "${MOONRAKER_CONF}.tapo_camera.XXXXXX")"
 strip_managed_block "$MOONRAKER_CONF" "$CONTENT_MOONRAKER"
 
 TMP_MOONRAKER="$(mktemp "${MOONRAKER_CONF}.tapo_camera.XXXXXX")"
 update_manager_path "$CONTENT_MOONRAKER" "$TMP_MOONRAKER"
 mv "$TMP_MOONRAKER" "$CONTENT_MOONRAKER"
-TMP_MOONRAKER=""
+TMP_MOONRAKER="$(mktemp "${MOONRAKER_CONF}.tapo_camera.XXXXXX")"
 
 if grep -Fqx "$CAMERA_SECTION" "$CONTENT_MOONRAKER"; then
     echo "ERROR: $CAMERA_SECTION already exists outside the plugin block; leaving it unchanged." >&2
