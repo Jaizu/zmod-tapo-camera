@@ -19,6 +19,7 @@ POWER_ON_CREATED="$POWER_ON.tapo_camera.created"
 MARK_BEGIN="# ZMOD_TAPO_CAMERA_BEGIN"
 MARK_END="# ZMOD_TAPO_CAMERA_END"
 CAMERA_SECTION="[webcam Tapo C210]"
+UPDATE_MANAGER_SECTION="[update_manager tapo_camera]"
 SERVICE="$PLUGIN_DIR/tapo_camera.sh"
 PYTHON="/usr/prog/Python-3.8.2/bin/python3"
 PYTHON_LD="/usr/prog/Python-3.8.2/lib:/usr/prog/openssl-1.0.2d/lib"
@@ -153,6 +154,19 @@ strip_managed_block() {
     ' "$1" > "$2"
 }
 
+update_manager_path() {
+    awk -v section="$UPDATE_MANAGER_SECTION" -v path="$PLUGIN_DIR" '
+        /^\[[^]]+\][[:space:]]*$/ {
+            in_section = ($0 == section)
+        }
+        in_section && /^[[:space:]]*path[[:space:]]*:/ {
+            print "path: " path
+            next
+        }
+        { print }
+    ' "$1" > "$2"
+}
+
 if [ ! -f "$MOONRAKER_CONF" ]; then
     if [ -e "$MOONRAKER_CONF" ]; then
         echo "ERROR: $MOONRAKER_CONF exists but is not a regular file." >&2
@@ -166,6 +180,11 @@ fi
 TMP_MOONRAKER="$(mktemp "${MOONRAKER_CONF}.tapo_camera.XXXXXX")"
 CONTENT_MOONRAKER="$(mktemp "${MOONRAKER_CONF}.tapo_camera.XXXXXX")"
 strip_managed_block "$MOONRAKER_CONF" "$CONTENT_MOONRAKER"
+
+TMP_MOONRAKER="$(mktemp "${MOONRAKER_CONF}.tapo_camera.XXXXXX")"
+update_manager_path "$CONTENT_MOONRAKER" "$TMP_MOONRAKER"
+mv "$TMP_MOONRAKER" "$CONTENT_MOONRAKER"
+TMP_MOONRAKER=""
 
 if grep -Fqx "$CAMERA_SECTION" "$CONTENT_MOONRAKER"; then
     echo "ERROR: $CAMERA_SECTION already exists outside the plugin block; leaving it unchanged." >&2

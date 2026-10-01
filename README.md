@@ -53,7 +53,7 @@ Add the plugin to Z-Mod's Moonraker plugin configuration:
 [update_manager tapo_camera]
 type: git_repo
 channel: dev
-path: /root/printer_data/config/mod_data/plugins/tapo_camera
+path: /usr/data/config/mod_data/plugins/tapo_camera
 origin: https://github.com/Jaizu/zmod-tapo-camera.git
 is_system_service: False
 primary_branch: main
