@@ -39,7 +39,8 @@ cleanup() {
 trap cleanup 0
 
 mkdir -p "$CONFIG_DIR" /usr/data/logs "$USER_CONFIG_DIR"
-chmod 700 "$PLUGIN_DIR/tapo_camera.py" "$SERVICE"
+chmod 644 "$PLUGIN_DIR/tapo_camera.py"
+chmod 700 "$SERVICE"
 
 if [ ! -f "$CONF" ]; then
     if [ -f "$LEGACY_CONF" ]; then
