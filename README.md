@@ -35,6 +35,10 @@ plugin uses almost no CPU or Wi-Fi bandwidth when nobody is watching. The
 `bin/go2rtc.LICENSE`), because the plugin is installed with git and the printer
 may lack an HTTPS-capable downloader.
 
+The binary has one byte changed: its ELF header is marked NaN2008, which the
+AD5X kernel requires. Without it the kernel refuses to run it and the log shows
+`line 1: syntax error: unexpected ")"`.
+
 Snapshots (`/api/frame.jpeg`, used by timelapse and notifications) are made on
 demand with the printer's built-in FFmpeg from a single key frame.
 

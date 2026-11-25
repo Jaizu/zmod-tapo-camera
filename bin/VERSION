@@ -1,2 +1,7 @@
 go2rtc v1.9.15 (linux_mipsel), https://github.com/AlexxIT/go2rtc/releases/tag/v1.9.15
-sha256 2a72e0acf2d5cb02b65ab99723e72faa8d786180f916048da7a78c831dbc7222  go2rtc
+upstream sha256 2a72e0acf2d5cb02b65ab99723e72faa8d786180f916048da7a78c831dbc7222
+
+Patched: ELF e_flags 0x50001004 -> 0x50001404 (EF_MIPS_NAN2008, one byte at offset 37).
+The AD5X kernel (5.10, NaN2008 FPU) refuses legacy-NaN binaries with ENOEXEC, which
+BusyBox reports as "line 1: syntax error: unexpected )". Go does not set the flag itself.
+sha256 4b93ecf822128079f1d16301e459a9cfa349c7dbaa1dee8b494eb0a32ba8277d  go2rtc
