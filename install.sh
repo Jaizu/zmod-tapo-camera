@@ -38,16 +38,7 @@ mkdir -p "$CONFIG_DIR" /usr/data/logs "$USER_CONFIG_DIR"
 # 755 keeps the tracked mode, so the plugin repository is not reported as dirty.
 chmod 755 "$SERVICE" "$GO2RTC"
 
-if [ ! -f "$CONF" ]; then
-    if [ -f "$LEGACY_CONF" ]; then
-        cp "$LEGACY_CONF" "$CONF"
-        echo "Migrated existing configuration from $LEGACY_CONF"
-    else
-        cp "$PLUGIN_DIR/tapo_camera.conf.example" "$CONF"
-    fi
-    chmod 600 "$CONF"
-    echo "Created $CONF"
-fi
+ensure_config
 
 ENABLED="$(read_config ENABLED 0)"
 FPS="$(read_config FPS 15)"

@@ -57,7 +57,7 @@ RTSP and SRTP servers are disabled.
 
 ## Configuration
 
-The plugin creates `/root/printer_data/config/tapo_camera.conf`, editable under **Machine > Configuration Files** in Mainsail. After changing settings, run `ENABLE_PLUGIN name=tapo_camera` in the printer console to rerun the plugin installer and restart the camera service. The installer uses `HTTP_PUBLIC_HOST=auto` to find the printer's default-route IPv4 address and writes the resulting browser URLs into the marked Moonraker webcam section. Set `HTTP_PUBLIC_HOST` to a fixed IP or LAN hostname if automatic detection is unsuitable.
+The plugin creates `/usr/data/config/tapo_camera.conf`, editable under **Machine > Configuration Files** in Mainsail. After changing settings, run `ENABLE_PLUGIN name=tapo_camera` in the printer console to rerun the plugin installer and restart the camera service. The installer uses `HTTP_PUBLIC_HOST=auto` to find the printer's default-route IPv4 address and writes the resulting browser URLs into the marked Moonraker webcam section. Set `HTTP_PUBLIC_HOST` to a fixed IP or LAN hostname if automatic detection is unsuitable.
 
 ```ini
 ENABLED=1
@@ -96,7 +96,7 @@ controls. This reloads Moonraker's configuration; Z-Mod's plugin command
 restarts Klipper, not Moonraker. After the printer is back online, enter
 `ENABLE_PLUGIN name=tapo_camera` in the printer console. Z-Mod downloads the
 plugin, runs its installer, and restarts Klipper. The first run creates
-`/root/printer_data/config/tapo_camera.conf`.
+`/usr/data/config/tapo_camera.conf`.
 
 In **Machine > Configuration Files**, edit `tapo_camera.conf` with the
 camera's RTSP host, port, username, password, and stream path, then set

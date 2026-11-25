@@ -4,7 +4,8 @@ set -e
 PLUGIN_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 
 USER_CONFIG_DIR="/usr/data/config/mod_data"
-CONF="/root/printer_data/config/tapo_camera.conf"
+CONF="/usr/data/config/tapo_camera.conf"
+LEGACY_CONFS="/root/printer_data/config/tapo_camera.conf /usr/data/config/mod_data/tapo_camera.conf"
 
 MOONRAKER_CONF="$USER_CONFIG_DIR/user.moonraker.conf"
 MOONRAKER_CREATED="$MOONRAKER_CONF.tapo_camera.created"
@@ -102,7 +103,7 @@ elif [ -f "$POWER_ON" ]; then
     fi
 fi
 
-rm -f "$CONF"
+rm -f "$CONF" $LEGACY_CONFS
 
 echo "Removing plugin files..."
 cd /

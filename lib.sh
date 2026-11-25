@@ -1,9 +1,14 @@
 # Shared helpers for the Tapo camera plugin. Sourced by the other scripts;
 # expects PLUGIN_DIR to be set by the caller.
 
-CONFIG_DIR="/root/printer_data/config"
+# Z-Mod runs Moonraker chrooted in /usr/data/.mod/.zmod, where /root/printer_data/config
+# is the same directory as /usr/data/config (the one Mainsail shows). Outside the chroot
+# (power_on.sh, Klipper) /root/printer_data/config is a different, hidden directory, so
+# the configuration lives in /usr/data/config, which is the same path on both sides.
+CONFIG_DIR="/usr/data/config"
 CONF="$CONFIG_DIR/tapo_camera.conf"
-LEGACY_CONF="/usr/data/config/mod_data/tapo_camera.conf"
+# Older versions used these; the first one found is migrated when $CONF is missing.
+LEGACY_CONFS="/root/printer_data/config/tapo_camera.conf /usr/data/config/mod_data/tapo_camera.conf"
 
 GO2RTC="$PLUGIN_DIR/bin/go2rtc"
 RUN_DIR="/tmp/tapo_camera"
@@ -19,6 +24,23 @@ PYTHON="/usr/prog/Python-3.8.2/bin/python3"
 PYTHON_LD="/usr/prog/Python-3.8.2/lib:/usr/prog/openssl-1.0.2d/lib"
 
 STREAM_NAME="tapo"
+
+# ensure_config: create $CONF from a legacy copy or the example when it is missing.
+ensure_config() {
+    [ -f "$CONF" ] && return 0
+    mkdir -p "$CONFIG_DIR"
+    for _legacy in $LEGACY_CONFS; do
+        if [ -f "$_legacy" ]; then
+            cp "$_legacy" "$CONF"
+            chmod 600 "$CONF"
+            echo "Migrated configuration from $_legacy to $CONF"
+            return 0
+        fi
+    done
+    cp "$PLUGIN_DIR/tapo_camera.conf.example" "$CONF"
+    chmod 600 "$CONF"
+    echo "Created $CONF; configure the Tapo camera first."
+}
 
 # read_config KEY [DEFAULT]: value of KEY in $CONF, unquoted; DEFAULT when unset or empty.
 read_config() {

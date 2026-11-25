@@ -113,11 +113,7 @@ supervise() {
 }
 
 start() {
-    if [ ! -f "$CONF" ]; then
-        cp "$PLUGIN_DIR/tapo_camera.conf.example" "$CONF"
-        chmod 600 "$CONF"
-        echo "Created $CONF; configure the Tapo camera first."
-    fi
+    ensure_config
 
     if ! is_enabled; then
         [ -n "$(find_pids)" ] && stop
