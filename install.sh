@@ -3,10 +3,7 @@
 set -e
 
 PLUGIN_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-
-CONFIG_DIR="/root/printer_data/config"
-LEGACY_CONF="/usr/data/config/mod_data/tapo_camera.conf"
-CONF="$CONFIG_DIR/tapo_camera.conf"
+. "$PLUGIN_DIR/lib.sh"
 
 USER_CONFIG_DIR="/usr/data/config/mod_data"
 MOONRAKER_CONF="$USER_CONFIG_DIR/user.moonraker.conf"
@@ -21,8 +18,6 @@ MARK_END="# ZMOD_TAPO_CAMERA_END"
 CAMERA_SECTION="[webcam Tapo C210]"
 UPDATE_MANAGER_SECTION="[update_manager tapo_camera]"
 SERVICE="$PLUGIN_DIR/tapo_camera.sh"
-PYTHON="/usr/prog/Python-3.8.2/bin/python3"
-PYTHON_LD="/usr/prog/Python-3.8.2/lib:/usr/prog/openssl-1.0.2d/lib"
 MOONRAKER_CONF_CHANGED=0
 TMP_POWER=""
 CONTENT_POWER=""
@@ -39,8 +34,9 @@ cleanup() {
 trap cleanup 0
 
 mkdir -p "$CONFIG_DIR" /usr/data/logs "$USER_CONFIG_DIR"
-chmod 644 "$PLUGIN_DIR/tapo_camera.py"
-chmod 700 "$SERVICE"
+# Git tracks these as executable; make sure a checkout without modes still works.
+# 755 keeps the tracked mode, so the plugin repository is not reported as dirty.
+chmod 755 "$SERVICE" "$GO2RTC"
 
 if [ ! -f "$CONF" ]; then
     if [ -f "$LEGACY_CONF" ]; then
@@ -53,33 +49,10 @@ if [ ! -f "$CONF" ]; then
     echo "Created $CONF"
 fi
 
-read_config() {
-    awk -v wanted="$1" '
-        /^[[:space:]]*#/ || index($0, "=") == 0 { next }
-        {
-            name = $0
-            sub(/=.*/, "", name)
-            gsub(/^[[:space:]]+|[[:space:]]+$/, "", name)
-            if (toupper(name) == wanted) {
-                value = $0
-                sub(/^[^=]*=/, "", value)
-                gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
-                quote = sprintf("%c", 39)
-                first = substr(value, 1, 1)
-                last = substr(value, length(value), 1)
-                if (first == "\"" || first == quote) value = substr(value, 2)
-                if (last == "\"" || last == quote) value = substr(value, 1, length(value) - 1)
-                print value
-                exit
-            }
-        }
-    ' "$CONF"
-}
-
-HTTP_PORT="$(read_config HTTP_PORT)"
-FPS="$(read_config FPS)"
-PUBLIC_HOST="$(read_config HTTP_PUBLIC_HOST)"
-ENABLED="$(read_config ENABLED)"
+ENABLED="$(read_config ENABLED 0)"
+FPS="$(read_config FPS 15)"
+API_PORT="$(read_config API_PORT 1984)"
+ASPECT_RATIO="$(read_config ASPECT_RATIO 16:9)"
 
 case "$ENABLED" in
     1) CAMERA_ENABLED=true ;;
@@ -90,50 +63,27 @@ case "$ENABLED" in
         ;;
 esac
 
-case "$HTTP_PORT" in
-    ''|*[!0-9]*)
-        echo "ERROR: HTTP_PORT must be a number in $CONF" >&2
-        exit 1
-        ;;
-esac
-
-if [ "$HTTP_PORT" -lt 1 ] || [ "$HTTP_PORT" -gt 65535 ]; then
-    echo "ERROR: HTTP_PORT must be between 1 and 65535" >&2
+if ! is_number "$API_PORT" || [ "$API_PORT" -lt 1 ] || [ "$API_PORT" -gt 65535 ]; then
+    echo "ERROR: API_PORT must be between 1 and 65535 in $CONF" >&2
     exit 1
 fi
 
-case "$FPS" in
-    ''|*[!0-9]*)
-        echo "ERROR: FPS must be a number in $CONF" >&2
-        exit 1
-        ;;
-esac
-
-if [ "$FPS" -lt 1 ]; then
-    echo "ERROR: FPS must be greater than zero" >&2
+if ! is_number "$FPS" || [ "$FPS" -lt 1 ]; then
+    echo "ERROR: FPS must be a number greater than zero in $CONF" >&2
     exit 1
 fi
 
-case "$PUBLIC_HOST" in
-    ''|auto|AUTO)
-        if [ ! -x "$PYTHON" ]; then
-            echo "ERROR: Python not found: $PYTHON" >&2
-            exit 1
-        fi
-        PUBLIC_HOST="$(LD_LIBRARY_PATH="$PYTHON_LD${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
-            "$PYTHON" -c 'import socket; sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); sock.connect(("192.0.2.1", 9)); print(sock.getsockname()[0]); sock.close()' 2>/dev/null)" || {
-            echo "ERROR: Could not determine the printer address. Set HTTP_PUBLIC_HOST in $CONF." >&2
-            exit 1
-        }
-        ;;
-esac
-
-case "$PUBLIC_HOST" in
-    ''|*[!A-Za-z0-9.-]*)
-        echo "ERROR: HTTP_PUBLIC_HOST must be an IPv4 address or hostname" >&2
+case "$ASPECT_RATIO" in
+    *[!0-9:]*|'')
+        echo "ERROR: ASPECT_RATIO must look like 16:9 in $CONF" >&2
         exit 1
         ;;
 esac
+
+PUBLIC_HOST="$(public_host)" || {
+    echo "ERROR: Could not determine the printer address. Set HTTP_PUBLIC_HOST in $CONF." >&2
+    exit 1
+}
 
 strip_managed_block() {
     awk -v begin="$MARK_BEGIN" -v end="$MARK_END" '
@@ -191,10 +141,20 @@ if grep -Fqx "$CAMERA_SECTION" "$CONTENT_MOONRAKER"; then
     exit 1
 fi
 
+BASE_URL="http://$PUBLIC_HOST:$API_PORT/api"
 cp -p "$MOONRAKER_CONF" "$TMP_MOONRAKER"
 cat "$CONTENT_MOONRAKER" > "$TMP_MOONRAKER"
-printf '%s\n%s\nenabled: %s\nservice: mjpegstreamer\ntarget_fps: %s\nstream_url: http://%s:%s/\n%s\n' \
-    "$MARK_BEGIN" "$CAMERA_SECTION" "$CAMERA_ENABLED" "$FPS" "$PUBLIC_HOST" "$HTTP_PORT" "$MARK_END" >> "$TMP_MOONRAKER"
+cat >> "$TMP_MOONRAKER" <<EOF
+$MARK_BEGIN
+$CAMERA_SECTION
+enabled: $CAMERA_ENABLED
+service: webrtc-go2rtc
+target_fps: $FPS
+aspect_ratio: $ASPECT_RATIO
+stream_url: $BASE_URL/ws?src=$STREAM_NAME
+snapshot_url: $BASE_URL/frame.jpeg?src=$STREAM_NAME
+$MARK_END
+EOF
 
 if cmp -s "$MOONRAKER_CONF" "$TMP_MOONRAKER"; then
     rm -f "$TMP_MOONRAKER"
@@ -243,7 +203,8 @@ echo "Restarting Tapo camera..."
 echo
 
 echo "Configuration: $CONF"
-echo "HTTP endpoint: http://$PUBLIC_HOST:$HTTP_PORT/"
+echo "Stream (WebRTC): $BASE_URL/ws?src=$STREAM_NAME"
+echo "Snapshot: $BASE_URL/frame.jpeg?src=$STREAM_NAME"
 if [ "$MOONRAKER_CONF_CHANGED" -eq 1 ]; then
-    echo "Moonraker webcam configuration changed. Restart Moonraker from Mainsail to load it."
+    echo "Moonraker webcam configuration changed. Reboot the printer (or restart Moonraker) to load it."
 fi

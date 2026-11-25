@@ -49,6 +49,7 @@ echo "Stopping Tapo camera..."
 if [ -x "$PLUGIN_DIR/tapo_camera.sh" ]; then
     "$PLUGIN_DIR/tapo_camera.sh" stop
 fi
+rm -rf /tmp/tapo_camera
 
 if [ -f "$MOONRAKER_CONF" ] && grep -Fqx "$MARK_BEGIN" "$MOONRAKER_CONF"; then
     TMP="$(mktemp "${MOONRAKER_CONF}.tapo_camera.XXXXXX")"

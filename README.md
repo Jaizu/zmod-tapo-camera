@@ -4,39 +4,56 @@ A Z-Mod plugin for Flashforge AD5X that publishes an RTSP camera as a native
 Mainsail webcam. It was developed with a Tapo C210, which is used in the
 examples, but it can also work with other camera models and brands that expose
 an RTSP stream compatible with the URL settings and FFmpeg input used here. It
-uses the printer's built-in FFmpeg and Python 3.8 and does not modify Nginx or
+relays the stream with go2rtc without transcoding and does not modify Nginx or
 internal Z-Mod files.
 
 This is not a universal camera integration: the camera must provide RTSP
 access, and its host, port, credentials, and stream path must fit the
-configuration below. The RTSP stream must use a format supported by the
-printer's FFmpeg build. ONVIF discovery and manufacturer-specific setup are not
+configuration below. The video must be H.264 (H.265 cannot be played by most
+browsers over WebRTC). ONVIF discovery and manufacturer-specific setup are not
 implemented; check your camera's RTSP URL and codec before using it.
 
 ## Architecture
 
 ```text
 Tapo C210 RTSP (H.264)
+        |   pulled only while someone is watching
+        v
+go2rtc on the printer (bin/go2rtc, no transcoding)
+        |
+        +--> Moonraker [webcam Tapo C210], service: webrtc-go2rtc
         |
         v
-FFmpeg on printer
-        |
-        v
-Python multipart-MJPEG server on 0.0.0.0:8090
-        |
-        +--> Moonraker [webcam Tapo C210], service: mjpegstreamer
-        |
-        v
-Browser loads http://PRINTER_IP:8090/ directly
+Browser plays the H.264 stream over WebRTC (ports 1984 + 8555)
 ```
 
-Moonraker stores webcam metadata and exposes it through `/server/webcams/list`; it does not proxy this stream. Mainsail's `mjpegstreamer` adapter fetches the URL directly from the browser and parses the multipart MJPEG frames the server emits, so the address must be reachable from the browser. `HTTP_HOST=0.0.0.0` makes the stream available on the printer's network interfaces. Note that Mainsail's `ipstream` service type (listed in Moonraker's docs) is not actually implemented by Mainsail's current front-end code, which is why `mjpegstreamer` is used instead.
+[go2rtc](https://github.com/AlexxIT/go2rtc) relays the camera's own H.264
+stream to the browser, which decodes it. The printer never decodes or encodes
+video, and go2rtc only connects to the camera while a viewer is open, so the
+plugin uses almost no CPU or Wi-Fi bandwidth when nobody is watching. The
+`linux_mipsel` build of go2rtc is shipped in `bin/` (see `bin/VERSION` and
+`bin/go2rtc.LICENSE`), because the plugin is installed with git and the printer
+may lack an HTTPS-capable downloader.
 
-The installed Moonraker reads the plugin's marked webcam section from `/usr/data/config/mod_data/user.moonraker.conf`, included by Z-Mod's Moonraker configuration. The plugin does not edit the included system configuration itself.
+Snapshots (`/api/frame.jpeg`, used by timelapse and notifications) are made on
+demand with the printer's built-in FFmpeg from a single key frame.
+
+Mainsail and Fluidd connect to go2rtc directly from the browser, so the
+printer address must be reachable from the browser. Moonraker only stores the
+webcam metadata. The installed Moonraker reads the plugin's marked webcam
+section from `/usr/data/config/mod_data/user.moonraker.conf`, included by
+Z-Mod's Moonraker configuration. The plugin does not edit any file tracked by
+Z-Mod, so Z-Mod's own repositories are never reported as dirty.
+
+go2rtc's configuration is regenerated in `/tmp/tapo_camera/go2rtc.yaml` on
+every start (mode 600, never written to persistent storage). Its HTTP API only
+allows `/api/ws`, `/api/webrtc` and `/api/frame.jpeg`; the web UI and the
+endpoints that can change streams or the configuration are blocked, and the
+RTSP and SRTP servers are disabled.
 
 ## Configuration
 
-The plugin creates `/root/printer_data/config/tapo_camera.conf`, editable under **Machine > Configuration Files** in Mainsail. After changing settings, run `ENABLE_PLUGIN name=tapo_camera` in the printer console to rerun the plugin installer and restart the camera service. The installer uses `HTTP_PUBLIC_HOST=auto` to find the printer's default-route IPv4 address and writes the resulting browser URL into the marked Moonraker webcam section. Set `HTTP_PUBLIC_HOST` to a fixed IP or LAN hostname if automatic detection is unsuitable, then rerun the plugin as described below.
+The plugin creates `/root/printer_data/config/tapo_camera.conf`, editable under **Machine > Configuration Files** in Mainsail. After changing settings, run `ENABLE_PLUGIN name=tapo_camera` in the printer console to rerun the plugin installer and restart the camera service. The installer uses `HTTP_PUBLIC_HOST=auto` to find the printer's default-route IPv4 address and writes the resulting browser URLs into the marked Moonraker webcam section. Set `HTTP_PUBLIC_HOST` to a fixed IP or LAN hostname if automatic detection is unsuitable.
 
 ```ini
 ENABLED=1
@@ -45,16 +62,14 @@ PORT=554
 USERNAME=tapo_user
 PASSWORD=tapo_password
 STREAM=stream2
-WIDTH=640
-HEIGHT=360
-FPS=10
-JPEG_QUALITY=6
-HTTP_HOST=0.0.0.0
-HTTP_PORT=8090
+ASPECT_RATIO=16:9
+FPS=15
+API_PORT=1984
+WEBRTC_PORT=8555
 HTTP_PUBLIC_HOST=auto
 ```
 
-The RTSP URL is generated as `rtsp://USER:PASSWORD@HOST:PORT/STREAM`; credentials are URL-escaped by the server. Do not commit real credentials.
+The RTSP URL is generated as `rtsp://USER:PASSWORD@HOST:PORT/STREAM`; credentials are URL-escaped. `stream2` is the camera's 640x360 sub-stream and is the lightest option on Wi-Fi; `stream1` is full resolution. Since the video is not transcoded, both cost the printer the same CPU. `FPS` is only a hint for the web interface. Settings from older versions (`WIDTH`, `HEIGHT`, `JPEG_QUALITY`, `HTTP_HOST`, `HTTP_PORT`) are ignored. Do not commit real credentials.
 
 ## Installation
 
@@ -98,13 +113,13 @@ the printer so Moonraker drops the webcam entry.
 
 ## Testing
 
-Open `http://PRINTER_IP:8090/` from a device on the same LAN to test the stream
-directly. Moonraker should list the webcam at
-`http://PRINTER_IP:7125/server/webcams/list`.
+Moonraker should list the webcam at `http://PRINTER_IP:7125/server/webcams/list`
+with `service: webrtc-go2rtc`. A snapshot can be checked at
+`http://PRINTER_IP:1984/api/frame.jpeg?src=tapo`. The service log is
+`/usr/data/logs/tapo_camera.log`.
 
-The `mjpegstreamer` adapter requires `stream_url` only; no snapshot URL is
-configured, so this integration provides live video only. If the printer's IP
-changes, update `HTTP_PUBLIC_HOST`, run `ENABLE_PLUGIN name=tapo_camera` in the
-printer console, and reboot the printer so Moonraker reloads the webcam URL.
-This direct HTTP stream has no authentication or TLS; keep it on a trusted LAN
-and do not expose port 8090 or the camera's RTSP port to the Internet.
+If the printer's IP changes, update `HTTP_PUBLIC_HOST` (or leave it on `auto`),
+run `ENABLE_PLUGIN name=tapo_camera` in the printer console, and reboot the
+printer so Moonraker reloads the webcam URLs. The stream has no authentication
+or TLS; keep it on a trusted LAN and do not expose ports 1984 and 8555 or the
+camera's RTSP port to the Internet.
